@@ -113,7 +113,10 @@ def train_and_save_clustering_model(config):
             
             running_loss += loss.item()
         
-            print(f'Epoch [{epoch+1}/{config["num_epochs"]}], Loss: {running_loss:.4f}')
+            # Print progress
+        if (epoch + 1) % 50 == 0:
+            avg_loss = running_loss / len(data_loader)
+            print(f'Epoch [{epoch+1}/{config["num_epochs"]}], Loss: {avg_loss:.4f}')
 
     # Get encodings for clustering
     print("Performing clustering...")
@@ -160,14 +163,14 @@ def main():
     config = {
         'random_seed': 42,
         'batch_size': 90000,
-        'num_epochs': 500,
-        'learning_rate': 0.00005,
+        'num_epochs': 1000,
+        'learning_rate': 0.00001,
         'input_dim': 72,
         'encoding_dim': 20,
         'latent_dim': 10,
         'n_clusters': 10,
         'train_data_path': 'final_datasets/train_dataset.csv',
-        'save_dir': './models/clustering',
+        'save_dir': './models/clustering', #clustering
         'visualize': True
     }
 

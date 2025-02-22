@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
+import seaborn as sns
+from sklearn.metrics import confusion_matrix
 
 
 class DigitDataset(Dataset):
@@ -154,13 +156,41 @@ def plot_metrics(train_losses, train_accuracies, test_accuracies):
     plt.tight_layout()
     plt.show()
 
+def get_all_predictions(model, test_loader, device):
+
+    model.eval()
+    all_preds = []
+    all_labels = []
+    with torch.no_grad():
+        for inputs, labels in test_loader:
+            inputs = inputs.to(device)
+            outputs = model(inputs)
+            _, preds = torch.max(outputs, 1)
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+    return np.array(all_labels), np.array(all_preds)
+
+def plot_confusion_matrix(cm, classes,
+                          normalize=False,
+                          title='Confusion Matrix',
+                          cmap=plt.cm.Blues):
+
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='.2f' if normalize else 'd', cmap=cmap)
+    plt.title(title)
+    plt.ylabel('True Label')
+    plt.xlabel('Predicted Label')
+    plt.show()
 
 def main():
     # Configuration
     RANDOM_SEED = 42                        #42
-    BATCH_SIZE = 64                         #64
+    BATCH_SIZE = 16                         #64
     NUM_EPOCHS = 500                        #500
-    LEARNING_RATE = 0.00005                 #0.00005
+    LEARNING_RATE = 0.0005                 #0.00005
     MODEL_SAVE_PATH = "./models/classification/classif_model.pth"
     CONTINUE_TRAINING = True
 
@@ -222,6 +252,13 @@ def main():
     # Final test accuracy
     final_test_accuracy = test_model(model, test_loader, device)
     print(f'\nFinal Test Accuracy: {final_test_accuracy:.2f}%')
+
+    # Compute and plot confusion matrix
+    true_labels, pred_labels = get_all_predictions(model, test_loader, device)
+    cm = confusion_matrix(true_labels, pred_labels)
+    print("Confusion Matrix:")
+    print(cm)
+    plot_confusion_matrix(cm, classes=np.unique(true_labels), normalize=True)
 
     # Save model
     save_model(model, optimizer, NUM_EPOCHS, train_losses[-1], MODEL_SAVE_PATH)
