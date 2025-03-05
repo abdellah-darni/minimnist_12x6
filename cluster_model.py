@@ -8,6 +8,13 @@ from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 from pathlib import Path
 import pickle
+import seaborn as sns
+import plotly.express as px
+import plotly.graph_objs as go
+from sklearn.manifold import TSNE
+import base64
+from PIL import Image
+from io import BytesIO
 
 class DigitDataset(Dataset):
     def __init__(self, features, labels=None):
@@ -59,6 +66,122 @@ def save_models(autoencoder, kmeans, save_dir):
         pickle.dump(kmeans, f)
     
     print(f"Models saved to {save_dir}")
+
+
+def create_detailed_visualizations(autoencoder, kmeans, encodings, X_train, y_train, config):
+
+    # 1. Cluster Composition Analysis
+    plt.figure(figsize=(15, 6))
+    
+    # Count digits in each cluster
+    cluster_labels = kmeans.labels_
+    cluster_digit_composition = {}
+    for cluster in range(config['n_clusters']):
+        cluster_data = y_train[cluster_labels == cluster]
+        unique, counts = np.unique(cluster_data, return_counts=True)
+        cluster_digit_composition[cluster] = dict(zip(unique, counts))
+    
+    # Prepare data for stacked bar plot
+    cluster_names = list(range(config['n_clusters']))
+    digit_colors = plt.cm.tab10.colors
+    
+    plt.subplot(121)
+    bottom = np.zeros(len(cluster_names))
+    
+    for digit in range(10):
+        digit_counts = [cluster_digit_composition[cluster].get(digit, 0) for cluster in cluster_names]
+        plt.bar(cluster_names, digit_counts, bottom=bottom, label=f'Digit {digit}', color=digit_colors[digit])
+        bottom += digit_counts
+    
+    plt.title('Digit Composition in Each Cluster')
+    plt.xlabel('Cluster')
+    plt.ylabel('Number of Samples')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    
+    # 2. Reconstruction Quality
+    plt.subplot(122)
+    
+    # Compute reconstruction error for each cluster
+    autoencoder.eval()
+    reconstruction_errors = []
+    
+    for cluster in range(config['n_clusters']):
+        cluster_mask = (cluster_labels == cluster)
+        cluster_data = X_train[cluster_mask]
+        
+        # Convert to tensor
+        cluster_tensor = torch.FloatTensor(cluster_data)
+        
+        # Compute reconstruction
+        with torch.no_grad():
+            _, reconstructed = autoencoder(cluster_tensor)
+        
+        # Compute mean squared error
+        mse = np.mean(np.square(cluster_data - reconstructed.numpy()), axis=1)
+        reconstruction_errors.append(np.mean(mse))
+    
+    plt.bar(cluster_names, reconstruction_errors, color='skyblue')
+    plt.title('Reconstruction Error by Cluster')
+    plt.xlabel('Cluster')
+    plt.ylabel('Mean Reconstruction Error')
+    
+    plt.tight_layout()
+    plt.savefig(f"{config['save_dir']}/cluster_analysis.png")
+    plt.close()
+
+    # 3. Interactive 3D Visualization with Cluster Information
+    # Perform t-SNE
+    tsne_3d = TSNE(n_components=3, random_state=config['random_seed'])
+    X_tsne_3d = tsne_3d.fit_transform(encodings)
+    
+    # Prepare hover text with detailed information
+    hover_text = []
+    for i, (cluster, digit) in enumerate(zip(cluster_labels, y_train)):
+        # Count of each digit in this cluster
+        digit_counts = cluster_digit_composition[cluster]
+        digit_percent = digit_counts.get(digit, 0) / sum(digit_counts) * 100
+        
+        hover_info = (
+            f"Cluster: {cluster}<br>"
+            f"Digit: {digit}<br>"
+            f"Cluster Composition:<br>"
+            + "\n".join([f"Digit {d}: {count} ({count/sum(digit_counts)*100:.1f}%)" 
+                         for d, count in sorted(digit_counts.items())])
+        )
+        hover_text.append(hover_info)
+    
+    # Interactive 3D plot
+    fig = go.Figure(data=[go.Scatter3d(
+        x=X_tsne_3d[:, 0],
+        y=X_tsne_3d[:, 1],
+        z=X_tsne_3d[:, 2],
+        mode='markers',
+        marker=dict(
+            size=5,
+            color=cluster_labels,
+            colorscale='Viridis',
+            opacity=0.8
+        ),
+        text=hover_text,
+        hoverinfo='text'
+    )])
+
+    fig.update_layout(
+        title='3D Visualization of Clustering Results',
+        scene=dict(
+            xaxis_title='Dimension 1',
+            yaxis_title='Dimension 2',
+            zaxis_title='Dimension 3'
+        )
+    )
+
+    # Save interactive plot
+    fig.write_html(f"{config['save_dir']}/cluster_interactive_3d.html")
+
+    print("Detailed Visualization Completed:")
+    print(f"Cluster Analysis Plot: {config['save_dir']}/cluster_analysis.png")
+    print(f"Interactive 3D Visualization: {config['save_dir']}/cluster_interactive_3d.html")
+
 
 def train_and_save_clustering_model(config):
     
@@ -114,7 +237,11 @@ def train_and_save_clustering_model(config):
             running_loss += loss.item()
         
             # Print progress
-        if (epoch + 1) % 50 == 0:
+        # if (epoch + 1) % 50 == 0:
+        #     avg_loss = running_loss / len(data_loader)
+        #     print(f'Epoch [{epoch+1}/{config["num_epochs"]}], Loss: {avg_loss:.4f}')
+
+        if (epoch + 1) % 5 == 0:
             avg_loss = running_loss / len(data_loader)
             print(f'Epoch [{epoch+1}/{config["num_epochs"]}], Loss: {avg_loss:.4f}')
 
@@ -140,22 +267,16 @@ def train_and_save_clustering_model(config):
 
     # Visualize results
     if config['visualize']:
-        from sklearn.manifold import TSNE
-        print("Creating visualization...")
         
-        # Use t-SNE for dimensionality reduction
-        tsne = TSNE(n_components=2, random_state=config['random_seed'])
-        encodings_2d = tsne.fit_transform(encodings)
-        
-        # Plot results
-        plt.figure(figsize=(10, 8))
-        scatter = plt.scatter(encodings_2d[:, 0], encodings_2d[:, 1], 
-                            c=cluster_labels, cmap='tab10')
-        plt.colorbar(scatter)
-        plt.title('Clustering Results (t-SNE visualization)')
-        plt.savefig(f"{config['save_dir']}/clustering_visualization.png")
-        plt.close()
-
+        create_detailed_visualizations(
+            autoencoder, 
+            kmeans, 
+            encodings, 
+            X_train, 
+            y_train, 
+            config
+        )
+  
     return autoencoder, kmeans, cluster_labels
 
 def main():
@@ -164,7 +285,7 @@ def main():
         'random_seed': 42,
         'batch_size': 90000,
         'num_epochs': 1000,
-        'learning_rate': 0.00001,
+        'learning_rate': 0.01,
         'input_dim': 72,
         'encoding_dim': 20,
         'latent_dim': 10,
