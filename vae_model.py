@@ -22,6 +22,7 @@ import umap
 import matplotlib.gridspec as gridspec
 from matplotlib.animation import FuncAnimation
 import os
+import matplotlib
 
 
 class DigitDataset(Dataset):
@@ -135,8 +136,8 @@ def create_detailed_visualizations(vae, kmeans, encodings, X_train, y_train, con
     cluster_labels = kmeans.labels_
 
     # Create color maps for digits and clusters
-    digit_cmap = plt.cm.get_cmap('tab10', 10)
-    cluster_cmap = plt.cm.get_cmap('viridis', config['n_clusters'])
+    digit_cmap = plt.get_cmap(name='tab10', lut=10)
+    cluster_cmap = plt.get_cmap(name='viridis', lut=config['n_clusters'])
 
     # 1. Cluster composition analysis - Create a more detailed stacked bar chart
     plt.figure(figsize=(16, 8))
@@ -274,7 +275,7 @@ def create_detailed_visualizations(vae, kmeans, encodings, X_train, y_train, con
     vae.eval()
 
     n_rows = 10  # One row per digit
-    n_cols = 6  # Original and 5 reconstructions
+    n_cols = 10  # 5 Original and 5 reconstructions
 
     sample_indices = []
     for digit in range(10):
@@ -709,7 +710,7 @@ def main():
         'latent_dim': 10,
         'n_clusters': 10,
         'train_data_path': 'final_datasets/train_dataset.csv',
-        'save_dir': './models/vae_clustering',
+        'save_dir': './models/vae_clustering1',
         'visualize': True,
         'beta_schedule': 'linear',  # Options: 'constant', 'linear', 'cyclical'
         'early_stopping': True,
