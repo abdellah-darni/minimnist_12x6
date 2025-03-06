@@ -30,22 +30,24 @@ class DigitDataset(Dataset):
         return self.features[idx]
 
 class AutoEncoder(nn.Module):
-    def __init__(self, input_dim=72, encoding_dim=20, latent_dim=10):
+    def __init__(self, input_dim=72, encoding1_dim=20,encoding2_dim=10, latent_dim=10):
         super(AutoEncoder, self).__init__()
         
         self.encoder = nn.Sequential(
-            nn.Linear(input_dim, encoding_dim),
+            nn.Linear(input_dim, encoding1_dim),
             nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(encoding_dim, latent_dim),
+            nn.Linear(encoding1_dim, encoding2_dim),
+            nn.ReLU(),
+            nn.Linear(encoding2_dim, latent_dim),
             nn.ReLU()
         )
         
         self.decoder = nn.Sequential(
-            nn.Linear(latent_dim, encoding_dim),
+            nn.Linear(latent_dim, encoding2_dim),
             nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(encoding_dim, input_dim),
+            nn.Linear(encoding2_dim, encoding1_dim),
+            nn.ReLU(),
+            nn.Linear(encoding1_dim, input_dim),
             nn.Sigmoid()
         )
 
@@ -210,7 +212,8 @@ def train_and_save_clustering_model(config):
     print("Initializing model...")
     autoencoder = AutoEncoder(
         input_dim=config['input_dim'],
-        encoding_dim=config['encoding_dim'],
+        encoding1_dim=config['encoding1_dim'],
+        encoding2_dim=config['encoding2_dim'],
         latent_dim=config['latent_dim']
     ).to(device)
     
@@ -287,11 +290,13 @@ def main():
         'num_epochs': 1000,
         'learning_rate': 0.01,
         'input_dim': 72,
-        'encoding_dim': 20,
+        'encoding1_dim': 20,
+        'encoding2_dim': 10,
         'latent_dim': 10,
         'n_clusters': 10,
-        'train_data_path': 'final_datasets/train_dataset.csv',
-        'save_dir': './models/clustering', #clustering
+        # 'train_data_path': 'final_datasets/train_dataset.csv',
+        'train_data_path': 'generated_data/gen_train_data.csv',
+        'save_dir': './models/test3', #clustering
         'visualize': True
     }
 
