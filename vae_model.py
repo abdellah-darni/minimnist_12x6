@@ -22,7 +22,7 @@ import umap
 import matplotlib.gridspec as gridspec
 from matplotlib.animation import FuncAnimation
 import os
-import matplotlib
+
 
 
 class DigitDataset(Dataset):
