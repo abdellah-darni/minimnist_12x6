@@ -50,7 +50,7 @@ if __name__ == "__main__":
     # generated dataset 
 
     # for training 
-    # csv_file = "./generated_data/train/gen_train_data.csv"
+    csv_file = "./new_data/gen_train_data.csv"
 
     # for testing 
     # csv_file = "./generated_data/test/gen_test_data.csv"
@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
     # the actual datasets
     # training 
-    csv_file = 'final_datasets/train_dataset.csv'
+    # csv_file = 'final_datasets/train_dataset.csv'
 
     # testing 
     # csv_file = 'final_datasets/test_dataset.csv'
