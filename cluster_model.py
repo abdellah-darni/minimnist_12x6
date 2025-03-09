@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 import os
 import torch
 import torch.nn as nn
@@ -78,31 +80,8 @@ def save_models(autoencoder, kmeans, save_dir):
     print(f"Models saved to {save_dir}")
 
 
-def create_detailed_visualizations(autoencoder, kmeans, encodings, X_train, y_train, config, input_samples=None):
-    """
-    Create detailed visualizations of the autoencoder and clustering results with enhanced capabilities:
-    - Latent space dimension analysis
-    - Input-to-output visualization
-    - Direct latent space manipulation
-
-    Parameters:
-    -----------
-    autoencoder : AutoEncoder model
-        The trained autoencoder model
-    kmeans : KMeans model
-        The trained clustering model
-    encodings : numpy.ndarray
-        The latent space encodings for the training data
-    X_train : numpy.ndarray
-        The training data features
-    y_train : numpy.ndarray
-        The training data labels
-    config : dict
-        Configuration parameters
-    input_samples : numpy.ndarray, optional
-        Custom input samples to visualize (if None, samples from training data are used)
-    """
-
+def create_detailed_visualizations(autoencoder, kmeans, encodings, X_train, y_train, config,cluster_labels, input_samples=None):
+    
     # Try to import UMAP, but continue even if it's not available
     try:
         import umap
@@ -115,15 +94,15 @@ def create_detailed_visualizations(autoencoder, kmeans, encodings, X_train, y_tr
     os.makedirs(save_dir, exist_ok=True)
 
     # Extract useful data
-    cluster_labels = kmeans.labels_
+    # cluster_labels = kmeans.labels_
 
     # Create color maps for digits and clusters
     digit_cmap = plt.cm.get_cmap(name='tab10', lut=10)
     cluster_cmap = plt.cm.get_cmap(name='viridis', lut=config['n_clusters'])
 
-    # ---------------------------------------------------
+    
     # 1. Cluster composition analysis
-    # ---------------------------------------------------
+    
     plt.figure(figsize=(16, 8))
     cluster_digit_composition = {}
     for cluster in range(config['n_clusters']):
@@ -182,41 +161,20 @@ def create_detailed_visualizations(autoencoder, kmeans, encodings, X_train, y_tr
     plt.savefig(f"{save_dir}/cluster_composition.png", dpi=300)
     plt.close()
 
-    # ---------------------------------------------------
     # 2. Latent space visualization with multiple techniques
-    # ---------------------------------------------------
+
     # Prepare the latent vectors
     latent_vecs = encodings
 
     # Create a multi-panel visualization
     fig = plt.figure(figsize=(20, 15))
-    gs = gridspec.GridSpec(2, 3 if has_umap else 2)
-
-    # 2.1 PCA visualization
-    pca = PCA(n_components=2)
-    latent_pca = pca.fit_transform(latent_vecs)
-
-    ax1 = plt.subplot(gs[0, 0])
-    scatter1 = ax1.scatter(latent_pca[:, 0], latent_pca[:, 1], c=y_train, cmap='tab10',
-                           alpha=0.6, s=10)
-    ax1.set_title(f'PCA - Digit Labels (Explained var: {pca.explained_variance_ratio_.sum():.2f})')
-    ax1.set_xlabel('PC1')
-    ax1.set_ylabel('PC2')
-    plt.colorbar(scatter1, ax=ax1, label='Digit')
-
-    ax2 = plt.subplot(gs[0, 1])
-    scatter2 = ax2.scatter(latent_pca[:, 0], latent_pca[:, 1], c=cluster_labels, cmap='viridis',
-                           alpha=0.6, s=10)
-    ax2.set_title('PCA - Cluster Labels')
-    ax2.set_xlabel('PC1')
-    ax2.set_ylabel('PC2')
-    plt.colorbar(scatter2, ax=ax2, label='Cluster')
+    gs = gridspec.GridSpec(2, 2, figure=fig)
 
     # 2.2 t-SNE visualization
     tsne = TSNE(n_components=2, random_state=config['random_seed'])
     latent_tsne = tsne.fit_transform(latent_vecs)
 
-    ax3 = plt.subplot(gs[0, 2] if has_umap else gs[1, 0])
+    ax3 = plt.subplot(gs[0, 0])
     scatter3 = ax3.scatter(latent_tsne[:, 0], latent_tsne[:, 1], c=y_train, cmap='tab10',
                            alpha=0.6, s=10)
     ax3.set_title('t-SNE - Digit Labels')
@@ -224,7 +182,7 @@ def create_detailed_visualizations(autoencoder, kmeans, encodings, X_train, y_tr
     ax3.set_ylabel('t-SNE 2')
     plt.colorbar(scatter3, ax=ax3, label='Digit')
 
-    ax4 = plt.subplot(gs[1, 0] if has_umap else gs[1, 1])
+    ax4 = plt.subplot(gs[1, 0])
     scatter4 = ax4.scatter(latent_tsne[:, 0], latent_tsne[:, 1], c=cluster_labels, cmap='viridis',
                            alpha=0.6, s=10)
     ax4.set_title('t-SNE - Cluster Labels')
@@ -232,12 +190,12 @@ def create_detailed_visualizations(autoencoder, kmeans, encodings, X_train, y_tr
     ax4.set_ylabel('t-SNE 2')
     plt.colorbar(scatter4, ax=ax4, label='Cluster')
 
-    # 2.3 UMAP visualization (if available)
+    # 2.3 UMAP visualization
     if has_umap:
         reducer = umap.UMAP(random_state=config['random_seed'])
         latent_umap = reducer.fit_transform(latent_vecs)
 
-        ax5 = plt.subplot(gs[1, 1])
+        ax5 = plt.subplot(gs[0, 1])
         scatter5 = ax5.scatter(latent_umap[:, 0], latent_umap[:, 1], c=y_train, cmap='tab10',
                                alpha=0.6, s=10)
         ax5.set_title('UMAP - Digit Labels')
@@ -245,7 +203,7 @@ def create_detailed_visualizations(autoencoder, kmeans, encodings, X_train, y_tr
         ax5.set_ylabel('UMAP 2')
         plt.colorbar(scatter5, ax=ax5, label='Digit')
 
-        ax6 = plt.subplot(gs[1, 2])
+        ax6 = plt.subplot(gs[1, 1])
         scatter6 = ax6.scatter(latent_umap[:, 0], latent_umap[:, 1], c=cluster_labels, cmap='viridis',
                                alpha=0.6, s=10)
         ax6.set_title('UMAP - Cluster Labels')
@@ -257,72 +215,49 @@ def create_detailed_visualizations(autoencoder, kmeans, encodings, X_train, y_tr
     plt.savefig(f"{save_dir}/latent_space_visualizations.png", dpi=300)
     plt.close()
 
-    # ---------------------------------------------------
-    # 3. NEW: Analyzing what each latent dimension represents
-    # ---------------------------------------------------
     latent_dim = config['latent_dim']
-    plt.figure(figsize=(20, 15))
+    plt.figure(figsize=(30, 15))  
+    gs = gridspec.GridSpec(2, 5, width_ratios=[1.2, 1, 1, 1, 1])
 
-    # 3.1 Correlation of each latent dimension with digit classes
-    # Create one-hot encoding for digits
-    digit_onehot = np.zeros((len(y_train), 10))
-    for i in range(len(y_train)):
-        digit_onehot[i, y_train[i]] = 1
+    # 3.1 Correlation heatmap
+    ax1 = plt.subplot(gs[:, 0])  
+    digit_onehot = np.eye(10)[y_train] 
 
-    # Calculate correlation between each latent dimension and each digit
     correlations = np.zeros((latent_dim, 10))
-    p_values = np.zeros((latent_dim, 10))
-
     for dim in range(latent_dim):
         for digit in range(10):
-            corr, p_val = pearsonr(latent_vecs[:, dim], digit_onehot[:, digit])
-            correlations[dim, digit] = corr
-            p_values[dim, digit] = p_val
+            correlations[dim, digit] = pearsonr(latent_vecs[:, dim], digit_onehot[:, digit])[0]
 
-    # Plot correlation heatmap
-    plt.subplot(121)
-    sns.heatmap(correlations, annot=True, cmap='coolwarm',
-                xticklabels=range(10), yticklabels=[f'Dim {i}' for i in range(latent_dim)])
-    plt.title('Correlation: Latent Dimensions vs Digit Classes')
-    plt.xlabel('Digit')
-    plt.ylabel('Latent Dimension')
+    sns.heatmap(correlations, annot=True, cmap='coolwarm', ax=ax1,
+            xticklabels=range(10), yticklabels=[f'Dim {i}' for i in range(latent_dim)])
+    ax1.set_title('Correlation: Latent Dimensions vs Digit Classes')
+    ax1.set_xlabel('Digit')
+    ax1.set_ylabel('Latent Dimension')
 
-    # 3.2 Plot latent dimension distributions by digit
-    dim_digit_data = []
-    for dim in range(min(5, latent_dim)):  # Show top 5 dimensions only
-        plt.subplot(2, 3, dim + 2)
+    # 3.2 Dimension distributions
+    num_dims_to_plot = min(5, latent_dim)
+    for dim in range(num_dims_to_plot):
+        ax = plt.subplot(gs[dim//3, 1 + (dim%3)])
         for digit in range(10):
             dim_values = latent_vecs[y_train == digit, dim]
-            sns.kdeplot(dim_values, label=f'Digit {digit}')
+            sns.kdeplot(dim_values, label=f'Digit {digit}', ax=ax)
+            
+        ax.set_title(f'Dimension {dim} Distribution')
+        ax.set_xlabel('Value')
+        ax.set_ylabel('Density')
+        if dim == 0: 
+            ax.legend()
 
-            # Also collect data for the interactive plot
-            for val in dim_values:
-                dim_digit_data.append({
-                    'dimension': f'Dimension {dim}',
-                    'value': val,
-                    'digit': f'Digit {digit}'
-                })
-
-        plt.title(f'Distribution of Latent Dimension {dim} by Digit')
-        plt.xlabel(f'Dimension {dim} Value')
-        plt.ylabel('Density')
-        plt.legend()
+    # Handle empty subplots when latent_dim < 5
+    for dim in range(num_dims_to_plot, 5):
+        ax = plt.subplot(gs[dim//3, 1 + (dim%3)])
+        ax.axis('off')
 
     plt.tight_layout()
-    plt.savefig(f"{save_dir}/latent_dimension_analysis.png", dpi=300)
+    plt.savefig(f"{save_dir}/latent_dimension_analysis.png", dpi=300, bbox_inches='tight')
     plt.close()
 
-    # Create interactive boxplot for all dimensions vs digits
-    dim_digit_df = pd.DataFrame(dim_digit_data)
-    fig = px.box(dim_digit_df, x='digit', y='value', color='digit',
-                 facet_col='dimension', facet_col_wrap=2,
-                 title='Distribution of Latent Space Dimensions by Digit')
-    fig.update_layout(height=1000, width=1000)
-    fig.write_html(f"{save_dir}/latent_boxplots_by_digit.html")
-
-    # ---------------------------------------------------
-    # 4. NEW: Input-to-output visualization with samples
-    # ---------------------------------------------------
+    # 4. Input-to-output visualization with samples
 
     # If custom inputs are provided, use them
     if input_samples is not None:
@@ -392,186 +327,6 @@ def create_detailed_visualizations(autoencoder, kmeans, encodings, X_train, y_tr
     plt.savefig(f"{save_dir}/input_output_visualization.png", dpi=300)
     plt.close()
 
-    # ---------------------------------------------------
-    # 5. NEW: Interactive latent space manipulation
-    # ---------------------------------------------------
-    # Create a figure with sliders to manipulate latent dimensions
-
-    # Generate an initial latent vector (average of all encoded vectors)
-    initial_latent = np.mean(encodings, axis=0)
-
-    # Create interactive visualization with Plotly
-    fig = make_subplots(rows=1, cols=2,
-                        subplot_titles=('Latent Space Sliders', 'Generated Output'),
-                        specs=[[{'type': 'domain'}, {'type': 'heatmap'}]])
-
-    # Create a starting image
-    with torch.no_grad():
-        initial_output = autoencoder.decoder(torch.FloatTensor(initial_latent).unsqueeze(0))
-        initial_output = initial_output.squeeze().numpy().reshape(12, 6)
-
-    # Add the heatmap for the digit image
-    heatmap = go.Heatmap(z=initial_output, colorscale='gray_r', showscale=False)
-    fig.add_trace(heatmap, row=1, col=2)
-
-    # Create a DataFrame for the sliders
-    slider_data = []
-    for dim in range(latent_dim):
-        # Find min/max values in the dataset for this dimension
-        dim_min = np.min(encodings[:, dim])
-        dim_max = np.max(encodings[:, dim])
-
-        # Add a margin
-        range_width = dim_max - dim_min
-        dim_min -= range_width * 0.2
-        dim_max += range_width * 0.2
-
-        # Get correlations with digits for this dimension
-        dim_correlations = correlations[dim]
-        most_correlated_digit = np.argmax(np.abs(dim_correlations))
-        correlation_strength = dim_correlations[most_correlated_digit]
-
-        # Add to slider data
-        slider_data.append({
-            'dimension': f'Dimension {dim}',
-            'value': initial_latent[dim],
-            'min': dim_min,
-            'max': dim_max,
-            'most_correlated_digit': int(most_correlated_digit),
-            'correlation': correlation_strength
-        })
-
-    # Create DataFrame
-    slider_df = pd.DataFrame(slider_data)
-
-    # Create a table for latent dimensions
-    table = go.Table(
-        header=dict(
-            values=['Dimension', 'Value', 'Most Correlated Digit', 'Correlation'],
-            font=dict(size=12),
-            align='left'
-        ),
-        cells=dict(
-            values=[
-                slider_df['dimension'],
-                slider_df['value'].round(2),
-                slider_df['most_correlated_digit'],
-                slider_df['correlation'].round(2)
-            ],
-            font=dict(size=11),
-            align='left'
-        )
-    )
-
-    fig.add_trace(table, row=1, col=1)
-
-    # Add sliders to control latent dimensions
-    sliders = []
-    for i, row in slider_df.iterrows():
-        sliders.append(
-            dict(
-                active=50,  # middle position
-                currentvalue={"prefix": f"Dimension {i}: "},
-                pad={"t": 30 + i * 20},
-                steps=[
-                    dict(
-                        method='restyle',
-                        args=[
-                            {},
-                            {}
-                        ],
-                        label=str(val)
-                    )
-                    for val in np.linspace(row['min'], row['max'], 100)
-                ]
-            )
-        )
-
-    fig.update_layout(
-        title_text="Interactive Latent Space Manipulation",
-        height=800,
-        width=1200,
-        sliders=sliders
-    )
-
-    # Add instructions and save
-    with open(f"{save_dir}/latent_manipulation.html", 'w') as f:
-        f.write("""
-        <html>
-        <head>
-            <title>Latent Space Manipulation</title>
-            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-        </head>
-        <body>
-            <h1>Interactive Latent Space Manipulation</h1>
-            <p>This tool lets you manually manipulate each dimension of the latent space to see how it affects the output.</p>
-            <p>Instructions:</p>
-            <ol>
-                <li>Change the sliders to manipulate different latent dimensions</li>
-                <li>The image on the right will update to show what digit the model generates</li>
-                <li>The table shows which digit each dimension is most correlated with</li>
-            </ol>
-
-            <div id="latent-plot"></div>
-
-            <script>
-                // Load pre-computed encodings and model
-                const initialLatent = """ + str(initial_latent.tolist()) + """;
-                let currentLatent = [...initialLatent];
-
-                // Create the initial plot
-                const plotDiv = document.getElementById('latent-plot');
-
-                // Create the plot layout
-                const layout = {
-                    title: 'Latent Space Manipulation',
-                    width: 1000,
-                    height: 600,
-                    grid: {rows: 1, columns: 2},
-                    sliders: []
-                };
-
-                // Create sliders for each dimension
-                """ + "\n".join([
-            f"""
-                    layout.sliders.push({{
-                        x: 0.1,
-                        y: {0.9 - i * 0.05},
-                        len: 0.8,
-                        currentvalue: {{
-                            prefix: 'Dimension {i}: ',
-                            xanchor: 'right'
-                        }},
-                        steps: Array.from({{ length: 100 }}, (_, j) => {{
-                            const val = {row['min']} + ({row['max']} - {row['min']}) * j / 99;
-                            return {{
-                                label: val.toFixed(2),
-                                method: 'animate',
-                                args: [[{{value: val}}]]
-                            }};
-                        }})
-                    }});
-                    """
-            for i, row in slider_df.iterrows()
-        ]) + """
-
-                // TO BE COMPLETED: Add JavaScript to handle slider interactions and update the image
-                // This would require serving this as a web application with a backend
-                // For static HTML export, we'll include instructions
-
-                // Create a placeholder plot
-                Plotly.newPlot(plotDiv, [{
-                    type: 'heatmap',
-                    z: """ + str(initial_output.tolist()) + """,
-                    colorscale: 'Greys'
-                }], layout);
-            </script>
-
-            <p><b>Note:</b> Full interactive manipulation requires a web server with Python backend. 
-            For a simpler version, see the static visualizations of latent space traversal.</p>
-        </body>
-        </html>
-        """)
 
     # 6. Improved latent space traversal visualization
     if config['latent_dim'] >= 2:
@@ -614,24 +369,9 @@ def create_detailed_visualizations(autoencoder, kmeans, encodings, X_train, y_tr
         plt.savefig(f"{save_dir}/latent_dimension_traversal.png", dpi=300)
         plt.close()
 
-    # ---------------------------------------------------
     # 7. Function to process custom inputs and generate outputs
-    # ---------------------------------------------------
     def process_custom_input(input_data, output_file=None):
-        """
-        Process a custom input through the autoencoder and visualize results
-
-        Parameters:
-        -----------
-        input_data : numpy.ndarray
-            Input data of shape (72,) or (n_samples, 72)
-        output_file : str, optional
-            If provided, save the visualization to this file
-
-        Returns:
-        --------
-        dict : Results containing original, encoding, and reconstruction
-        """
+        
         # Reshape input if needed
         if input_data.ndim == 1:
             input_data = input_data.reshape(1, -1)
@@ -687,24 +427,9 @@ def create_detailed_visualizations(autoencoder, kmeans, encodings, X_train, y_tr
             'reconstructed': reconstructed_np
         }
 
-    # ---------------------------------------------------
     # 8. Function to generate output from custom latent vector
-    # ---------------------------------------------------
     def generate_from_latent(latent_vector, output_file=None):
-        """
-        Generate output directly from a latent vector
 
-        Parameters:
-        -----------
-        latent_vector : numpy.ndarray
-            Latent vector of shape (latent_dim,) or (n_samples, latent_dim)
-        output_file : str, optional
-            If provided, save the visualization to this file
-
-        Returns:
-        --------
-        numpy.ndarray : Generated output(s)
-        """
         # Reshape if needed
         if latent_vector.ndim == 1:
             latent_vector = latent_vector.reshape(1, -1)
@@ -744,7 +469,7 @@ def create_detailed_visualizations(autoencoder, kmeans, encodings, X_train, y_tr
         return generated_np
 
     # Create sample use case for custom input
-    sample_input = X_train[y_train == 5][0:3]  # Get 3 examples of digit 5
+    sample_input = X_train[y_train == 5][0:3] 
     process_custom_input(sample_input, f"{save_dir}/sample_custom_input.png")
 
     # Create sample use case for latent vector manipulation
@@ -769,83 +494,152 @@ def train_semi_supervised_autoencoder(config):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
 
-    # Load data
+    # Load data with error handling
     print("Loading data...")
-    train_data = pd.read_csv(config['train_data_path'])
-    feature_columns = [f'pixel_{i}' for i in range(72)]
-    X_train = train_data[feature_columns].values
-    y_train = train_data['label'].values if 'label' in train_data.columns else None
+    try:
+        train_data = pd.read_csv(config['train_data_path'])
+        feature_columns = [f'pixel_{i}' for i in range(72)]
+        
+        # Check if all required columns exist
+        missing_cols = [col for col in feature_columns if col not in train_data.columns]
+        if missing_cols:
+            raise ValueError(f"Missing feature columns in dataset: {missing_cols}")
+            
+        X_train = train_data[feature_columns].values
+        y_train = train_data['label'].values if 'label' in train_data.columns else None
+        
+        # Validate data shape
+        if X_train.shape[1] != config['input_dim']:
+            raise ValueError(f"Input dimension mismatch: expected {config['input_dim']}, got {X_train.shape[1]}")
+            
+    except Exception as e:
+        print(f"Error loading data: {str(e)}")
+        raise
 
     # Create dataset and dataloader
-    dataset = DigitDataset(X_train, y_train)
-    data_loader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True)
+    try:
+        dataset = DigitDataset(X_train, y_train)
+        data_loader = DataLoader(
+            dataset, 
+            batch_size=min(config['batch_size'], len(dataset)),  # Prevent batch size > dataset size
+            shuffle=True
+        )
+    except Exception as e:
+        print(f"Error creating dataloader: {str(e)}")
+        raise
 
     # Initialize model and optimizer
     print("Initializing model...")
-    autoencoder = AutoEncoder(
-        input_dim=config['input_dim'],
-        encoding1_dim=config['encoding1_dim'],
-        encoding2_dim=config['encoding2_dim'],
-        latent_dim=config['latent_dim']
-    ).to(device)
+    try:
+        autoencoder = AutoEncoder(
+            input_dim=config['input_dim'],
+            encoding1_dim=config['encoding1_dim'],
+            encoding2_dim=config['encoding2_dim'],
+            latent_dim=config['latent_dim']
+        ).to(device)
 
-    optimizer = optim.Adam(autoencoder.parameters(), lr=config['learning_rate'])
-    criterion = nn.MSELoss()
+        optimizer = optim.Adam(autoencoder.parameters(), lr=config['learning_rate'])
+        criterion = nn.MSELoss()
+    except Exception as e:
+        print(f"Error initializing model: {str(e)}")
+        raise
 
     # Train autoencoder
     print("Training autoencoder...")
     autoencoder.train()
-    for epoch in range(config['num_epochs']):
-        running_loss = 0.0
-        for batch_features, batch_labels in data_loader:
-            batch_features = batch_features.to(device)
+    contrastive_weight = config.get('contrastive_weight', 0.1)
+    margin = config.get('margin', 1.0)
+    use_label_guidance = config.get('use_label_guidance', False)
+    
+    try:
+        for epoch in range(config['num_epochs']):
+            running_loss = 0.0
+            batch_count = 0
+            
+            for batch_features, batch_labels in data_loader:
+                # Check for NaN or Inf in inputs
+                if torch.isnan(batch_features).any() or torch.isinf(batch_features).any():
+                    print(f"Warning: NaN or Inf found in batch features, skipping batch")
+                    continue
+                    
+                batch_features = batch_features.to(device)
+                if batch_labels is not None and use_label_guidance:
+                    batch_labels = batch_labels.to(device)
 
-            # Forward pass
-            optimizer.zero_grad()
-            encoded, reconstructed = autoencoder(batch_features)
+                # Forward pass
+                optimizer.zero_grad()
+                try:
+                    encoded, reconstructed = autoencoder(batch_features)
+                except RuntimeError as e:
+                    print(f"Forward pass error: {str(e)}")
+                    print(f"Input shape: {batch_features.shape}")
+                    continue
 
-            # Reconstruction loss
-            recon_loss = criterion(reconstructed, batch_features)
+                # Check for NaN or Inf in outputs
+                if torch.isnan(encoded).any() or torch.isinf(encoded).any() or \
+                   torch.isnan(reconstructed).any() or torch.isinf(reconstructed).any():
+                    print(f"Warning: NaN or Inf found in outputs, skipping batch")
+                    continue
 
-            # Clustering guidance loss (if we have labels)
-            if batch_labels is not None and config['use_label_guidance']:
-                # Calculate pairwise distances in latent space
-                pairwise_dist = torch.cdist(encoded, encoded, p=2)
+                # Reconstruction loss
+                recon_loss = criterion(reconstructed, batch_features)
 
-                # Create a mask for same-label pairs (1 if same label, 0 if different)
-                label_matrix = batch_labels.unsqueeze(0) == batch_labels.unsqueeze(1)
+                # Clustering guidance loss (if we have labels and guidance is enabled)
+                if batch_labels is not None and use_label_guidance:
+                    try:
+                        # Calculate pairwise distances in latent space
+                        pairwise_dist = torch.cdist(encoded, encoded, p=2)
+                        
+                        # Create a mask for same-label pairs (1 if same label, 0 if different)
+                        label_matrix = batch_labels.unsqueeze(0) == batch_labels.unsqueeze(1)
+                        
+                        # Convert to float and to device
+                        label_matrix = label_matrix.float()
+                        
+                        # Calculate contrastive loss
+                        # For same label pairs: distance should be small
+                        same_label_loss = label_matrix * pairwise_dist
+                        
+                        # For different label pairs: distance should be at least margin
+                        diff_label_loss = (1 - label_matrix) * torch.clamp(margin - pairwise_dist, min=0)
+                        
+                        # Combine both components
+                        contrastive_loss = (same_label_loss + diff_label_loss).mean()
+                        
+                        # Total loss with weighting
+                        loss = recon_loss + contrastive_weight * contrastive_loss
+                    except RuntimeError as e:
+                        print(f"Contrastive loss error: {str(e)}")
+                        loss = recon_loss  # Fallback to just using reconstruction loss
+                else:
+                    loss = recon_loss
 
-                # Convert to float and to device
-                label_matrix = label_matrix.float().to(device)
+                # Check if loss is valid
+                if torch.isnan(loss) or torch.isinf(loss):
+                    print(f"Warning: Loss is NaN or Inf, skipping batch")
+                    continue
 
-                # Calculate contrastive loss
-                # Minimize distance for same label, maximize for different labels
-                margin = config['margin']
+                # Backward pass with error handling
+                try:
+                    loss.backward()
+                    # Gradient clipping to prevent exploding gradients
+                    torch.nn.utils.clip_grad_norm_(autoencoder.parameters(), max_norm=1.0)
+                    optimizer.step()
+                except RuntimeError as e:
+                    print(f"Backward pass error: {str(e)}")
+                    continue
 
-                # For same label pairs: distance should be small
-                same_label_loss = label_matrix * pairwise_dist
+                running_loss += loss.item()
+                batch_count += 1
 
-                # For different label pairs: distance should be at least margin
-                diff_label_loss = (1 - label_matrix) * torch.clamp(margin - pairwise_dist, min=0)
-
-                # Combine both components
-                contrastive_loss = (same_label_loss + diff_label_loss).mean()
-
-                # Total loss with weighting
-                loss = recon_loss + config['contrastive_weight'] * contrastive_loss
-            else:
-                loss = recon_loss
-
-            # Backward pass
-            loss.backward()
-            optimizer.step()
-
-            running_loss += loss.item()
-
-        # Print progress
-        if (epoch + 1) % 5 == 0:
-            avg_loss = running_loss / len(data_loader)
-            print(f'Epoch [{epoch + 1}/{config["num_epochs"]}], Loss: {avg_loss:.4f}')
+            # Print progress
+            if batch_count > 0 and (epoch + 1) % 5 == 0:
+                avg_loss = running_loss / batch_count
+                print(f'Epoch [{epoch + 1}/{config["num_epochs"]}], Loss: {avg_loss:.4f}')
+    except Exception as e:
+        print(f"Training error: {str(e)}")
+        # Continue to use the partially trained model instead of aborting completely
+        print("Using partially trained model...")
 
     # Get encodings
     print("Extracting encodings...")
@@ -853,149 +647,124 @@ def train_semi_supervised_autoencoder(config):
     all_encodings = []
     all_labels = []
 
-    with torch.no_grad():
-        for batch_features, batch_labels in data_loader:
-            batch_features = batch_features.to(device)
-            encoded, _ = autoencoder(batch_features)
-            all_encodings.append(encoded.cpu().numpy())
-            if batch_labels is not None:
-                all_labels.append(batch_labels.numpy())
+    try:
+        with torch.no_grad():
+            for batch_features, batch_labels in data_loader:
+                if torch.isnan(batch_features).any() or torch.isinf(batch_features).any():
+                    continue
+                    
+                batch_features = batch_features.to(device)
+                encoded, _ = autoencoder(batch_features)
+                
+                # Check for valid encodings
+                if torch.isnan(encoded).any() or torch.isinf(encoded).any():
+                    continue
+                    
+                all_encodings.append(encoded.cpu().numpy())
+                if batch_labels is not None:
+                    all_labels.append(batch_labels.numpy())
 
-    encodings = np.concatenate(all_encodings)
-    labels = np.concatenate(all_labels) if all_labels else None
+        if not all_encodings:
+            raise ValueError("No valid encodings generated")
+            
+        encodings = np.concatenate(all_encodings)
+        labels = np.concatenate(all_labels) if all_labels else None
+    except Exception as e:
+        print(f"Error extracting encodings: {str(e)}")
+        raise
 
-    # Perform clustering
+    # Perform clustering with error handling
     print("Performing clustering...")
+    clustering_method = config.get('clustering_method', 'kmeans')
+    n_clusters = config.get('n_clusters', 10)
+    cluster_labels = None
 
-    if config['clustering_method'] == 'kmeans':
-        # Standard KMeans
-        kmeans = KMeans(n_clusters=config['n_clusters'], random_state=config['random_seed'])
-        cluster_labels = kmeans.fit_predict(encodings)
-        clustering_model = kmeans
 
-    elif config['clustering_method'] == 'gmm':
-        # Gaussian Mixture Model
-        from sklearn.mixture import GaussianMixture
-        gmm = GaussianMixture(
-            n_components=config['n_clusters'],
-            covariance_type='full',
-            random_state=config['random_seed'],
-            max_iter=100
-        )
-        cluster_labels = gmm.fit_predict(encodings)
-        clustering_model = gmm
-
-    elif config['clustering_method'] == 'dbscan':
-        # DBSCAN
-        from sklearn.cluster import DBSCAN
-        dbscan = DBSCAN(eps=config['dbscan_eps'], min_samples=config['dbscan_min_samples'])
-        cluster_labels = dbscan.fit_predict(encodings)
-        clustering_model = dbscan
-
-    elif config['clustering_method'] == 'semi_supervised':
-        # Semi-supervised clustering with label propagation
-        from sklearn.semi_supervised import LabelPropagation
-
-        # Use a small portion of labels to guide clustering
-        if labels is not None:
-            label_mask = np.zeros(len(labels), dtype=bool)
-            for digit in range(10):
-                # Take some samples from each digit
-                digit_indices = np.where(labels == digit)[0]
-                if len(digit_indices) > 0:
-                    # Use 10% of each digit's samples (or at least 1)
-                    n_samples = max(1, int(len(digit_indices) * 0.1))
-                    label_indices = np.random.choice(digit_indices, n_samples, replace=False)
-                    label_mask[label_indices] = True
-
-            # Create semi-supervised labels: -1 for unlabeled points
-            semi_labels = np.full(len(labels), -1)
-            semi_labels[label_mask] = labels[label_mask]
-
-            # Label propagation
-            model = LabelPropagation()
-            cluster_labels = model.fit(encodings, semi_labels).predict(encodings)
-            clustering_model = model
-        else:
-            # Fallback to KMeans if no labels
-            kmeans = KMeans(n_clusters=config['n_clusters'], random_state=config['random_seed'])
+    try:
+        if clustering_method == 'kmeans':
+            # Standard KMeans
+            kmeans = KMeans(
+                n_clusters=n_clusters, 
+                random_state=config['random_seed'],
+                n_init=10  # Increase from default for better convergence
+            )
             cluster_labels = kmeans.fit_predict(encodings)
             clustering_model = kmeans
 
-    else:
-        # Default to KMeans
-        kmeans = KMeans(n_clusters=config['n_clusters'], random_state=config['random_seed'])
+        elif clustering_method == 'gmm':
+            # Gaussian Mixture Model
+            from sklearn.mixture import GaussianMixture
+            gmm = GaussianMixture(
+                n_components=n_clusters,
+                covariance_type='full',
+                random_state=config['random_seed'],
+                max_iter=100,
+                n_init=5  # Multiple initializations for better convergence
+            )
+            cluster_labels = gmm.fit_predict(encodings)
+            clustering_model = gmm
+
+
+
+        else:
+            # Default to KMeans
+            print(f"Unknown clustering method '{clustering_method}', using KMeans")
+            kmeans = KMeans(n_clusters=config['n_clusters'], random_state=config['random_seed'], n_init='auto')
+            cluster_labels = kmeans.fit_predict(encodings)
+            clustering_model = kmeans
+            
+        # Validate that clustering worked    
+        if cluster_labels is None or len(cluster_labels) != len(encodings):
+            raise ValueError("Clustering failed to produce valid labels")
+            
+    except Exception as e:
+        print(f"Clustering error: {str(e)}")
+        # Create a fallback clustering model if needed
+        print("Creating fallback clustering...")
+        kmeans = KMeans(n_clusters=n_clusters, random_state=config['random_seed'])
         cluster_labels = kmeans.fit_predict(encodings)
         clustering_model = kmeans
 
-    # Save model and return results
-    save_models(autoencoder, clustering_model, config['save_dir'])
+    # Save model
+    try:
+        save_models(autoencoder, clustering_model, config['save_dir'])
+    except Exception as e:
+        print(f"Error saving models: {str(e)}")
+        # Continue even if saving fails
 
-    return autoencoder, clustering_model, encodings, cluster_labels, labels
-
-
-# def main():
-#     # Configuration
-#     config = {
-#         'random_seed': 42,
-#         'batch_size': 512,
-#         'num_epochs': 200,
-#         'learning_rate': 0.001,
-#         'input_dim': 72,
-#         'encoding1_dim': 64,
-#         'encoding2_dim': 32,
-#         'latent_dim': 10,
-#         'n_clusters': 10,
-#         # 'train_data_path': 'final_datasets/train_dataset.csv',
-#         'train_data_path': 'new_data/gen_train_data.csv',
-#         'save_dir': './models/new_cl',  # clustering
-#         'visualize': True
-#     }
-#
-#     # Create save directory if it doesn't exist
-#     os.makedirs(config['save_dir'], exist_ok=True)
-#
-#     # Train and save model
-#     autoencoder, kmeans, cluster_labels = train_and_save_clustering_model(config)
-#
-#     print("\nTraining and saving completed!")
-#     print(f"Models saved in {config['save_dir']}")
-#     if config['visualize']:
-#         print(f"Visualizations saved in {config['save_dir']}")
+    return autoencoder, clustering_model, encodings, cluster_labels, labels, X_train
 
 
 def main():
     # Updated configuration
     config = {
         'random_seed': 42,
-        'batch_size': 128,  # Reduced batch size for better generalization
-        'num_epochs': 300,  # Increased epochs
+        'batch_size': 128,  
+        'num_epochs': 500,  
         'learning_rate': 0.001,
         'input_dim': 72,
-        'encoding1_dim': 64,  # Wider network
-        'encoding2_dim': 32,  # Wider network
-        'latent_dim': 10,  # Match number of digits
+        'encoding1_dim': 64,  
+        'encoding2_dim': 32,  
+        'latent_dim': 10,  
         'n_clusters': 10,
-        'train_data_path': 'new_data/gen_train_data.csv',
-        'save_dir': './models/improved_clustering',
+        'train_data_path': 'final_datasets/train_dataset.csv',
+        'save_dir': './models/gmm_clustering',
         'visualize': True,
 
-        # New parameters for semi-supervised learning
         'use_label_guidance': True,
         'contrastive_weight': 0.5,
         'margin': 2.0,
 
         # Clustering method options
-        'clustering_method': 'semi_supervised',  # Options: 'kmeans', 'gmm', 'dbscan', 'semi_supervised'
-        'dbscan_eps': 0.5,
-        'dbscan_min_samples': 5
+        'clustering_method': 'gmm',  # Options: 'kmeans', 'gmm'.
+        
     }
 
     # Create save directory if it doesn't exist
     os.makedirs(config['save_dir'], exist_ok=True)
 
     # Train and save model with semi-supervised approach
-    autoencoder, clustering_model, encodings, cluster_labels, true_labels = train_semi_supervised_autoencoder(config)
+    autoencoder, clustering_model, encodings, cluster_labels, true_labels, X_train = train_semi_supervised_autoencoder(config)
 
     # Evaluate clustering performance if labels are available
     if true_labels is not None:
@@ -1034,7 +803,8 @@ def main():
             encodings,
             X_train,
             true_labels,
-            config
+            config,
+            cluster_labels
         )
 
     print("\nTraining and saving completed!")
