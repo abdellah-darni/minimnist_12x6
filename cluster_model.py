@@ -40,7 +40,7 @@ class DigitDataset(Dataset):
         return self.features[idx]
 
 class AutoEncoder(nn.Module):
-    def __init__(self, input_dim=72, encoding1_dim=20,encoding2_dim=10, latent_dim=10):
+    def __init__(self, input_dim=72, encoding1_dim=64,encoding2_dim=32, latent_dim=10):
         super(AutoEncoder, self).__init__()
         
         self.encoder = nn.Sequential(
