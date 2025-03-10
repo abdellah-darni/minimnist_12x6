@@ -180,7 +180,7 @@ def train_semi_supervised_vae(config):
     print("Training VAE...")
     vae.train()
     beta = config.get('beta', 1.0)
-    use_label_guidance = config.get('use_label_guidance', False)
+    use_label_guidance = config.get('use_label_guidance', True)
     contrastive_weight = config.get('contrastive_weight', 0.1)
     margin = config.get('margin', 1.0)
     
@@ -773,12 +773,12 @@ if __name__ == "__main__":
         'batch_size': 128,           
         'num_epochs': 500,           
         'random_seed': 42,           
-        'save_dir': 'results/vae_gmm_clustering', 
+        'save_dir': 'models/vae_kmeans_clustering', 
         'beta': 1.0,                  
         'use_label_guidance': True, 
         'contrastive_weight': 0.1,    
         'margin': 1.0,                
-        'clustering_method': 'gmm' # kmeans , gmm
+        'clustering_method': 'kmeans' # kmeans , gmm
     }
     
     
